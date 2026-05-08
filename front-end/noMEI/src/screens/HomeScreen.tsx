@@ -1,25 +1,49 @@
 /**
  * @file src/screens/HomeScreen.tsx
- * @placeholder — Dashboard Principal
- *
- * Sprint de implementação: Sprint 2
- * TODO: Barra de busca, filtros por categoria, banner de oportunidades, lista de editais.
+ * @description Dashboard Principal — busca + filtro por UF
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Header, BidCard, EmptyState, ErrorState } from '../components';
+import {
+   ActivityIndicator,
+   ScrollView,
+   StyleSheet,
+   Text,
+   TouchableOpacity,
+   View,
+} from 'react-native';
+import { Header, BidCard, EmptyState, ErrorState, Input } from '../components';
 import { colors, spacing, textPresets } from '../theme';
 import { useLicitacoes } from '../hooks';
 import { useProfile } from '../context/ProfileContext';
 import type { MainTabScreenProps } from '../types';
 
+const BRAZIL_UFS = [
+   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO',
+   'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI',
+   'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+];
+
 type Props = MainTabScreenProps<"Inicio">;
 
 export function HomeScreen({ navigation }: Props): React.JSX.Element {
    const { selectedCategories, selectedLabels } = useProfile();
-   const { items, loading, error } = useLicitacoes({ limit: 100 });
+
+   const [busca, setBusca] = useState('');
+   const [debouncedBusca, setDebouncedBusca] = useState('');
+   const [selectedUf, setSelectedUf] = useState<string | null>(null);
+
+   useEffect(() => {
+      const timer = setTimeout(() => setDebouncedBusca(busca.trim()), 400);
+      return () => clearTimeout(timer);
+   }, [busca]);
+
+   const { items, loading, error } = useLicitacoes({
+      limit: 100,
+      busca: debouncedBusca || undefined,
+      uf: selectedUf ?? undefined,
+   });
 
    const recommendedItems = useMemo(() => {
       const hasPreferences = selectedCategories.length > 0 || selectedLabels.length > 0;
@@ -52,10 +76,42 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
             <Text style={styles.greeting}>Olá, João! 👋</Text>
             <Text style={styles.subtitle}>Bem-vindo ao seu painel de licitações.</Text>
 
-            {/* Sprint 2: busca, filtros e banner aqui */}
-            <View style={styles.placeholderSection}>
-               <Text style={styles.placeholderLabel}>🔍 Busca e Filtros — Sprint 2</Text>
-            </View>
+            {/* Busca + Filtro por UF */}
+            <Input
+               leftIcon="search-outline"
+               placeholder="Buscar licitações..."
+               value={busca}
+               onChangeText={setBusca}
+               clearable
+               returnKeyType="search"
+            />
+
+            <ScrollView
+               horizontal
+               showsHorizontalScrollIndicator={false}
+               contentContainerStyle={styles.ufRow}
+               style={styles.ufScroll}
+            >
+               <TouchableOpacity
+                  style={[styles.ufChip, selectedUf === null && styles.ufChipActive]}
+                  onPress={() => setSelectedUf(null)}
+               >
+                  <Text style={[styles.ufChipText, selectedUf === null && styles.ufChipTextActive]}>
+                     Todos
+                  </Text>
+               </TouchableOpacity>
+               {BRAZIL_UFS.map((uf) => (
+                  <TouchableOpacity
+                     key={uf}
+                     style={[styles.ufChip, selectedUf === uf && styles.ufChipActive]}
+                     onPress={() => setSelectedUf((prev) => (prev === uf ? null : uf))}
+                  >
+                     <Text style={[styles.ufChipText, selectedUf === uf && styles.ufChipTextActive]}>
+                        {uf}
+                     </Text>
+                  </TouchableOpacity>
+               ))}
+            </ScrollView>
 
             <Text style={styles.sectionTitle}>Recomendadas para você</Text>
 
@@ -129,18 +185,38 @@ const styles = StyleSheet.create({
       color: colors.textPrimary,
       marginTop: spacing[2],
    },
-   placeholderSection: {
+   ufScroll: {
+      flexGrow: 0,
+      flexShrink: 0,
+   },
+   ufRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing[2],
+      paddingVertical: spacing[1],
+   },
+   ufChip: {
+      paddingHorizontal: spacing[3],
+      paddingVertical: 6,
+      height: 34,
+      borderRadius: 17,
       backgroundColor: colors.white,
-      borderRadius: 8,
-      padding: spacing[4],
       borderWidth: 1,
       borderColor: colors.border,
-      borderStyle: 'dashed',
+      justifyContent: 'center',
+      alignItems: 'center',
    },
-   placeholderLabel: {
+   ufChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+   },
+   ufChipText: {
       ...textPresets.bodyMd,
       color: colors.textSecondary,
-      textAlign: 'center',
+      fontWeight: '500',
+   },
+   ufChipTextActive: {
+      color: colors.white,
    },
    loader: {
       marginVertical: spacing[6],
