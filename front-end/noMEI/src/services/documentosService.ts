@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
@@ -67,4 +67,34 @@ export async function listarDocumentos(cnpj: string): Promise<DocumentoListRespo
     }
 
     return response.json();
+}
+
+export async function abrirDocumento(id: string): Promise<void> {
+    const url = `${API_BASE_URL}/documentos/${id}/download`;
+
+    if (Platform.OS === 'web') {
+        window.open(url, '_blank');
+        return;
+    }
+
+    const supported = await Linking.canOpenURL(url);
+
+    if (!supported) {
+        throw new Error('Não foi possível abrir o documento');
+    }
+
+    await Linking.openURL(url);
+}
+
+export async function deletarDocumento(id: string): Promise<void> {
+    const response = await fetch(
+        `${API_BASE_URL}/documentos/${id}`,
+        {
+            method: 'DELETE',
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(`Erro ao deletar documento: ${response.status}`);
+    }
 }

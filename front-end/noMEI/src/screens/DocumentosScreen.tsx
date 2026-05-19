@@ -1,17 +1,18 @@
 /**
  * @file src/screens/DocumentosScreen.tsx
  * @description Gestão de Documentos — upload e listagem via API
+ * 
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { Header, StatusBadge, Button, EmptyState, ErrorState } from '../components';
 import { colors, spacing, borderRadius, shadows, textPresets } from '../theme';
 import { useProfile } from '../context/ProfileContext';
-import { listarDocumentos, uploadDocumento, type Documento } from '../services/documentosService';
+import { listarDocumentos, uploadDocumento, abrirDocumento, deletarDocumento, type Documento } from '../services/documentosService';
 import type { MainTabScreenProps } from '../types';
 
 type Props = MainTabScreenProps<"Documentos">;
@@ -31,6 +32,8 @@ export function DocumentosScreen({ navigation: _navigation }: Props): React.JSX.
   const [loadingList, setLoadingList] = useState(false);
   const [errorList, setErrorList] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<Documento | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const fetchDocumentos = useCallback(async () => {
     if (!cnpj) return;
@@ -64,6 +67,11 @@ export function DocumentosScreen({ navigation: _navigation }: Props): React.JSX.
       setUploading(false);
     }
   }
+
+  function handleDocumentoMenu(doc: Documento): void {
+  setSelectedDoc(doc);
+  setMenuVisible(true);
+}
 
   // Web: usa input[type=file] nativo para garantir que o picker abra
   function handleWebFileChange(e: Event): void {
@@ -177,10 +185,110 @@ export function DocumentosScreen({ navigation: _navigation }: Props): React.JSX.
               </Text>
               <StatusBadge status={mapStatus(doc.status)} />
             </View>
-            <Ionicons name="ellipsis-vertical" size={18} color={colors.textSecondary} />
+            <TouchableOpacity onPress={() => handleDocumentoMenu(doc)}>
+              <Ionicons
+              name="ellipsis-vertical"
+              size={18}
+              color={colors.textSecondary}
+              />
+            </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
+
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {selectedDoc?.nome}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={async () => {
+                if (!selectedDoc) return;
+
+                try {
+                  await abrirDocumento(selectedDoc.id);
+                  setMenuVisible(false);
+                } catch {
+                  Alert.alert(
+                    'Erro',
+                    'Não foi possível abrir o documento.'
+                  );
+                }
+              }}
+            >
+              <Ionicons
+                name="eye-outline"
+                size={18}
+                color={colors.primary}
+              />
+
+              <Text style={styles.modalButtonText}>
+                Visualizar documento
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={async () => {
+                if (!selectedDoc) return;
+
+                try {
+                  await deletarDocumento(selectedDoc.id);
+
+                  setDocumentos((prev) =>
+                    prev.filter((item) => item.id !== selectedDoc.id)
+                  );
+
+                  setMenuVisible(false);
+
+                  Alert.alert(
+                    'Sucesso',
+                    'Documento removido.'
+                  );
+                } catch {
+                  Alert.alert(
+                    'Erro',
+                    'Não foi possível remover o documento.'
+                  );
+                }
+              }}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={18}
+                color={colors.error}
+              />
+
+              <Text
+                style={[
+                  styles.modalButtonText,
+                  { color: colors.error }
+                ]}
+              >
+                Deletar documento
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setMenuVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -276,6 +384,56 @@ const styles = StyleSheet.create({
   },
   docExpiry: {
     ...textPresets.bodySm,
+    color: colors.textSecondary,
+  },
+  
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing[4],
+  },
+
+  modalContent: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing[5],
+    gap: spacing[3],
+    ...shadows.md,
+  },
+
+  modalTitle: {
+    ...textPresets.labelLg,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+
+  modalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3],
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primaryLight,
+  },
+
+  modalButtonText: {
+    ...textPresets.labelMd,
+    color: colors.textPrimary,
+  },
+
+  cancelButton: {
+    marginTop: spacing[2],
+    alignItems: 'center',
+    paddingVertical: spacing[2],
+  },
+
+  cancelButtonText: {
+    ...textPresets.bodyMd,
     color: colors.textSecondary,
   },
 });
